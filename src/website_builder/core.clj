@@ -2,12 +2,26 @@
   (:require [stasis.core :as stasis]
             [markdown.core :as md]
             [clojure.string :as string]
-            [clojure.edn :as edn])
-  (:use [clojure.set :only (subset?)])
+            [clojure.edn :as edn]
+            [markdown.core :as md]
+            [net.cgrand.enlive-html :as enlive])
+  (:use [clojure.set :only (subset?)]
+        [ring.adapter.jetty :only (run-jetty)]
+        [ring.middleware.file :only (wrap-file)]
+        [ring.middleware.content-type :only (wrap-content-type)]
+        [ring.middleware.not-modified :only (wrap-not-modified)])
   (:gen-class))
 
 (def pages-dir-name "pages")
 (def pages-dir (clojure.java.io/file pages-dir-name))
+(def output-dir "output")
+
+(def handler
+  (-> (fn [r] nil)
+    (wrap-file output-dir) 
+    (wrap-content-type)))
+
+(defonce server (run-jetty #'handler {:port 3000 :join? false}))
 
 
 (defn contains-page-files
@@ -38,6 +52,39 @@
          (filter contains-page-files)
          (map #(.getPath %))
          (map data-from-dir))))
+
+
+(defn build-path
+  [{:keys [data]}]
+  (-> data
+      :name 
+      (string/replace #"[^\p{L}\p{Nd}]+" "_") 
+      (string/lower-case)
+      (str ".html")))
+
+(defn build-html
+  [{:keys [data page]}]
+  (md/md-to-html-string page))
+
+(defn build-page
+  [page-data]
+  {:path (build-path page-data)
+   :html (build-html page-data)})
+
+(defn save-page
+  [{:keys [html path]}]
+  (let [full-path (string/join "/" [output-dir path])]
+    (spit full-path html)))
+
+(defn save-website
+  []
+  (let [p (pages)]
+    (map save-page (map build-page p))))
+
+(defn enlive-markdown
+  []
+  (let [p (pages)]
+    (->> p (map build-page) (map #(enlive/html-snippet (:html %)))))) 
 
 
 (defn -main
