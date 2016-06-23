@@ -21,13 +21,14 @@
 
 (deftask build []
   (comp 
-        (cljs)
+        (cljs :optimizations :none)
         ))
 
 (deftask run []
   (comp (serve)
         (watch)
-        (cljs-repl :ws-host "0.0.0.0" :port 3449)
+        (speak)
+        (cljs-repl :ws-host "0.0.0.0" :port 7002)
         (reload :ws-host "0.0.0.0" :port 3449)
         (build)))
 
